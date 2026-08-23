@@ -32,20 +32,13 @@
     flex-direction:column;position:relative;box-shadow:0 0 40px rgba(162,40,90,.12);
   }
   .header{
-    padding:22px 24px 16px;background:linear-gradient(135deg,var(--rose-deep),var(--rose) 70%);
+    padding:22px 24px 18px;background:linear-gradient(135deg,var(--rose-deep),var(--rose) 70%);
     color:#fff;border-radius:0 0 26px 26px;box-shadow:0 6px 18px rgba(162,40,90,.25);
   }
   .brand-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
   .brand{font-family:Georgia,serif;font-size:30px;font-weight:700;display:flex;align-items:baseline;gap:8px;}
   .brand .dot{color:var(--gold);}
   .tagline{font-size:12.5px;opacity:.88;margin-top:2px;font-style:italic;}
-  .kpirow{display:flex;gap:10px;margin-top:16px;overflow-x:auto;padding-bottom:2px;}
-  .kpi{
-    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
-    border-radius:14px;padding:10px 12px;min-width:100px;flex:1;
-  }
-  .kpi .l{font-size:9.5px;text-transform:uppercase;opacity:.85;}
-  .kpi .v{font-size:14px;font-weight:700;margin-top:3px;}
   .content{flex:1;padding:20px;overflow-y:auto;}
   .grid-2col{display:grid;grid-template-columns:1fr;gap:20px;}
   @media(min-width:768px){.grid-2col{grid-template-columns:1fr 1fr;}}
@@ -118,6 +111,19 @@
   .item-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
   .item-row select{flex:2;}
   .item-row input{flex:1;}
+  .month-group{
+    background:#fff;border:1px solid var(--line);border-radius:16px;
+    padding:14px;margin-bottom:16px;
+  }
+  .month-header{
+    font-weight:700;font-size:15px;color:var(--rose-deep);padding-bottom:8px;
+    margin-bottom:10px;border-bottom:1.5px dashed var(--line);
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .month-stats{
+    font-size:12px;background:var(--blush);padding:8px 12px;border-radius:10px;
+    margin-bottom:10px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;
+  }
 </style>
 </head>
 <body>
@@ -152,6 +158,14 @@
   const pct = n => (((n||0)*100).toFixed(1)) + '%';
   const today = () => new Date().toISOString().slice(0,10);
   const dfmt = iso => { if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; };
+
+  const getMonthYearLabel = iso => {
+    if(!iso) return 'Outros';
+    const [y, m] = iso.split('-');
+    const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+    const idx = parseInt(m, 10) - 1;
+    return `${meses[idx] || m} de ${y}`;
+  };
 
   const DEFAULT_PRODUCTS = [
     {nome:'Body Splash', custo:16000, venda:24000},
@@ -221,11 +235,23 @@
     return p ? p.venda*qtd : 0;
   }
 
+  function totalCustoItem(produtoId, qtd){
+    const p = state.produtos.find(x=>x.id===produtoId);
+    return p ? p.custo*qtd : 0;
+  }
+
   function totalVenda(v){
     if(v.itens && Array.isArray(v.itens)){
       return v.itens.reduce((s, item) => s + totalVendaItem(item.produtoId, item.qtd), 0);
     }
     return totalVendaItem(v.produtoId, v.qtd);
+  }
+
+  function totalCusto(v){
+    if(v.itens && Array.isArray(v.itens)){
+      return v.itens.reduce((s, item) => s + totalCustoItem(item.produtoId, item.qtd), 0);
+    }
+    return totalCustoItem(v.produtoId, v.qtd);
   }
 
   function totalLucroItem(produtoId, qtd){
@@ -240,16 +266,7 @@
     return totalLucroItem(v.produtoId, v.qtd);
   }
 
-  function kpis(){
-    const faturamento = state.vendas.reduce((s,v)=>s+totalVenda(v),0);
-    const lucro = state.vendas.reduce((s,v)=>s+totalLucro(v),0);
-    const margem = faturamento ? lucro/faturamento : 0;
-    const emDivida = state.dividas.reduce((s,d)=>s+totalVenda(d),0);
-    return {faturamento, lucro, margem, emDivida};
-  }
-
   function header(){
-    const k = kpis();
     return `
     <div class="header">
       <div class="brand-row">
@@ -258,11 +275,6 @@
           <div class="tagline">Gestão do meu negócio 💗</div>
         </div>
         <div class="sync-badge">${useFirebase ? '🟢 Nuvem Ativa' : '🟡 Modo Local'}</div>
-      </div>
-      <div class="kpirow">
-        <div class="kpi"><div class="l">Faturamento</div><div class="v">${fmt(k.faturamento)}</div></div>
-        <div class="kpi"><div class="l">Lucro</div><div class="v">${fmt(k.lucro)}</div></div>
-        <div class="kpi"><div class="l">Em Dívida</div><div class="v" style="color:#ffb3c6;">${fmt(k.emDivida)}</div></div>
       </div>
     </div>`;
   }
@@ -284,7 +296,7 @@
   }
 
   function viewResumo(){
-    const k = kpis();
+    const emDivida = state.dividas.reduce((s,d)=>s+totalVenda(d),0);
     const ranking = state.produtos.map(p=>{
       const qtd = vendidoDe(p.id);
       const lucro = qtd*(p.venda-p.custo);
@@ -298,7 +310,7 @@
         <div class="section-title">Resumo Financeiro</div>
         <div class="card row">
           <div>
-            <div class="prod-name">${fmt(k.emDivida)}</div>
+            <div class="prod-name">${fmt(emDivida)}</div>
             <div class="prod-sub">Total a receber das clientes</div>
           </div>
           <div class="pill warn">A RECEBER</div>
@@ -330,6 +342,10 @@
       </div>
     `).join('');
 
+    const totalValorDivida = state.dividas.reduce((s,d)=>s+totalVenda(d),0);
+    const totalCustoDivida = state.dividas.reduce((s,d)=>s+totalCusto(d),0);
+    const totalLucroDivida = state.dividas.reduce((s,d)=>s+totalLucro(d),0);
+
     const list = [...state.dividas].sort((a,b)=> b.data.localeCompare(a.data)).map(d=>{
       let itensHtml = '';
       if(d.itens && Array.isArray(d.itens) && d.itens.length > 0){
@@ -342,13 +358,18 @@
         if(p) itensHtml = `<div>• ${p.nome} × ${d.qtd} <span style="opacity:0.7">(${fmt(p.venda * d.qtd)})</span></div>`;
       }
 
+      const c = totalCusto(d);
+      const l = totalLucro(d);
+
       return `
       <div class="card">
         <div class="row">
           <div>
             <div class="prod-name">👤 ${d.cliente}</div>
             <div class="prod-sub" style="margin-top:6px;line-height:1.4;color:var(--ink);">${itensHtml}</div>
-            <div class="prod-sub" style="margin-top:4px;font-size:11.5px;color:var(--muted);">Data: ${dfmt(d.data)}</div>
+            <div class="prod-sub" style="margin-top:4px;font-size:11.5px;color:var(--muted);">
+              Data: ${dfmt(d.data)} | Custo: <b>${fmt(c)}</b> | Lucro Est.: <b style="color:var(--ok);">${fmt(l)}</b>
+            </div>
           </div>
           <div class="pill warn">${fmt(totalVenda(d))}</div>
         </div>
@@ -378,6 +399,15 @@
       </div>
       <div>
         <div class="section-title">Dívidas Ativas</div>
+        ${state.dividas.length > 0 ? `
+        <div class="card" style="background:var(--blush);border-color:var(--rose-soft);margin-bottom:14px;">
+          <div class="prod-sub" style="font-size:12px;color:var(--ink);">
+            💰 Valor a Receber: <b>${fmt(totalValorDivida)}</b><br>
+            📦 Custo do Material: <b>${fmt(totalCustoDivida)}</b><br>
+            ✨ Lucro quando pago: <b style="color:var(--ok);font-size:14px;">${fmt(totalLucroDivida)}</b>
+          </div>
+        </div>
+        ` : ''}
         ${list || '<div class="empty">Nenhuma dívida pendente. 🎉</div>'}
       </div>
     </div>`;
@@ -421,28 +451,61 @@
 
   function viewVendas(){
     const options = state.produtos.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
-    const list = [...state.vendas].sort((a,b)=> b.data.localeCompare(a.data)).map(v=>{
-      let itensSummary = '';
-      if(v.itens && Array.isArray(v.itens) && v.itens.length > 0){
-        itensSummary = v.itens.map(it => {
-          const p = state.produtos.find(x=>x.id===it.produtoId);
-          return p ? `${p.nome} × ${it.qtd}` : '';
-        }).filter(Boolean).join(', ');
-      } else {
-        const p = state.produtos.find(x=>x.id===v.produtoId);
-        if(p) itensSummary = `${p.nome} × ${v.qtd}`;
-      }
+    
+    // Agrupar vendas por Mês
+    const vendasPorMes = {};
+    const sortedVendas = [...state.vendas].sort((a,b)=> b.data.localeCompare(a.data));
+
+    sortedVendas.forEach(v => {
+      const mesKey = v.data ? v.data.slice(0, 7) : 'Sem Data';
+      if(!vendasPorMes[mesKey]) vendasPorMes[mesKey] = [];
+      vendasPorMes[mesKey].push(v);
+    });
+
+    const mesKeys = Object.keys(vendasPorMes).sort().reverse();
+
+    const renderVendasGrupo = mesKeys.map(mesKey => {
+      const vendasDoMes = vendasPorMes[mesKey];
+      const fatMes = vendasDoMes.reduce((s,v) => s + totalVenda(v), 0);
+      const custoMes = vendasDoMes.reduce((s,v) => s + totalCusto(v), 0);
+      const lucroMes = vendasDoMes.reduce((s,v) => s + totalLucro(v), 0);
+
+      const itemsHtml = vendasDoMes.map(v => {
+        let itensSummary = '';
+        if(v.itens && Array.isArray(v.itens) && v.itens.length > 0){
+          itensSummary = v.itens.map(it => {
+            const p = state.produtos.find(x=>x.id===it.produtoId);
+            return p ? `${p.nome} × ${it.qtd}` : '';
+          }).filter(Boolean).join(', ');
+        } else {
+          const p = state.produtos.find(x=>x.id===v.produtoId);
+          if(p) itensSummary = `${p.nome} × ${v.qtd}`;
+        }
+
+        return `
+        <div class="card row" style="margin-bottom:6px;">
+          <div>
+            <div class="prod-name">${itensSummary}</div>
+            <div class="prod-sub">${dfmt(v.data)} · Lucro <b style="color:var(--ok);">${fmt(totalLucro(v))}</b></div>
+          </div>
+          <div class="row" style="gap:8px;">
+            <span class="pill">${fmt(totalVenda(v))}</span>
+            <button class="icon-btn del" data-del-venda="${v.id}">✕</button>
+          </div>
+        </div>`;
+      }).join('');
 
       return `
-      <div class="card row">
-        <div>
-          <div class="prod-name">${itensSummary}</div>
-          <div class="prod-sub">${dfmt(v.data)} · Lucro ${fmt(totalLucro(v))}</div>
+      <div class="month-group">
+        <div class="month-header">
+          <span>📅 ${getMonthYearLabel(mesKey)}</span>
         </div>
-        <div class="row" style="gap:8px;">
-          <span class="pill">${fmt(totalVenda(v))}</span>
-          <button class="icon-btn del" data-del-venda="${v.id}">✕</button>
+        <div class="month-stats">
+          <span>Vendas: <b>${fmt(fatMes)}</b></span>
+          <span>Custo: <b>${fmt(custoMes)}</b></span>
+          <span>Lucro: <b style="color:var(--ok);">${fmt(lucroMes)}</b></span>
         </div>
+        ${itemsHtml}
       </div>`;
     }).join('');
 
@@ -460,8 +523,8 @@
         </div>
       </div>
       <div>
-        <div class="section-title">Histórico de Vendas</div>
-        ${list || '<div class="empty">Ainda sem vendas registadas.</div>'}
+        <div class="section-title">Histórico de Vendas por Mês</div>
+        ${renderVendasGrupo || '<div class="empty">Ainda sem vendas registadas.</div>'}
       </div>
     </div>`;
   }
