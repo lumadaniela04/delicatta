@@ -591,7 +591,6 @@
       };
     }
 
-    // Dynamic items for Divida form
     $$('.nd-item-prod').forEach(select=>{
       select.onchange = (e)=>{
         const idx = parseInt(e.target.dataset.idx);
@@ -630,7 +629,6 @@
         const cliente = $('#nd-cliente').value.trim();
         const data = $('#nd-data').value || today();
         
-        // Filter valid items
         const validItens = formDividaItens.filter(it => it.produtoId && it.qtd > 0);
 
         if(!cliente || validItens.length === 0){
@@ -638,7 +636,6 @@
           return;
         }
 
-        // Create debt record with multiple items
         const newDivida = {
           id: uid(),
           cliente,
@@ -648,14 +645,7 @@
 
         state.dividas.push(newDivida);
 
-        // Abate cada produto do stock
-        validItens.forEach(it => {
-          if(state.estoque[it.produtoId] !== undefined){
-            state.estoque[it.produtoId] = Math.max(0, state.estoque[it.produtoId] - it.qtd);
-          }
-        });
-
-        // Reset form items
+        // RESET DOS ITENS DO FORMULARIO
         formDividaItens = [{ id: uid(), produtoId: '', qtd: 1 }];
 
         saveData();
@@ -667,7 +657,6 @@
         const id = btn.dataset.payDivida;
         const div = state.dividas.find(d=>d.id===id);
         if(div){
-          // Convert debt to sale (preserving multiple items)
           if(div.itens && Array.isArray(div.itens)){
             state.vendas.push({
               id: uid(),
