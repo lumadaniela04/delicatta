@@ -412,7 +412,7 @@
   }
 
   function enviarWhatsApp(divida) {
-    let msg = `Olá, ${formatTitleCase(divida.cliente)}! 💕%0A%0ASegue o resumo dos seus itens na *Delicatta*:%0A`;
+    let msg = `Olá, tudo bem? 💕%0AAqui é da Delicatta. Verificamos que o pagamento da sua compra ainda está em aberto.%0A%0A`;
     let total = 0;
 
     if (divida.itens && divida.itens.length > 0) {
@@ -432,7 +432,7 @@
       }
     }
 
-    msg += `%0A*Total Pendente: ${fmt(total)}*%0AData da compra: ${dfmt(divida.data)}%0A%0AQualquer dúvida estou à disposição! ✨`;
+    msg += `%0A*Total Pendente: ${fmt(total)}*%0A%0A📍 *Dados para pagamento:*%0A• IBAN: AO06 0055 0000 1448 5973 1018 1%0A• Express: 947351010%0A%0AObrigada pela confiança ✨`;
     window.open(`https://wa.me/?text=${msg}`, '_blank');
   }
 
