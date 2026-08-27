@@ -8,19 +8,20 @@
   <!-- Firebase Scripts (v8) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   
   <!-- jsPDF Script -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <style>
     :root {
-      --rose-bg: #fdf0f5;
-      --rose-light: #fbe4ee;
-      --rose-soft: #f8bbd0;
-      --rose-deep: #a8285e;
+      --rose-bg: #F7EBEF;
+      --rose-light: #FCE4EC;
+      --rose-soft: #F8BBD0;
+      --rose-deep: #B51B5A;
       --ink: #333333;
       --muted: #777777;
-      --line: #f3c2d6;
+      --line: #F3D5E0;
       --ok: #2e7d32;
       --warn: #c62828;
       --blush: #fff5f8;
@@ -29,12 +30,12 @@
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     body { margin: 0; background: var(--rose-bg); color: var(--ink); padding-bottom: 70px; }
 
-    .header { background: #ffffff; padding: 16px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; }
-    .brand { font-size: 24px; font-weight: bold; color: var(--rose-deep); }
+    .header { background: var(--rose-deep); padding: 16px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; color: #ffffff; }
+    .brand { font-size: 24px; font-weight: bold; color: #ffffff; }
     .brand .dot { color: var(--rose-soft); }
-    .tagline { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .tagline { font-size: 12px; color: var(--rose-light); margin-top: 2px; }
     .brand-row { display: flex; justify-content: space-between; align-items: center; }
-    .sync-badge { font-size: 11px; padding: 4px 8px; border-radius: 12px; background: var(--rose-light); color: var(--rose-deep); font-weight: 600; }
+    .sync-badge { font-size: 11px; padding: 4px 8px; border-radius: 12px; background: rgba(255, 255, 255, 0.2); color: #ffffff; font-weight: 600; }
 
     .content { padding: 16px; max-width: 900px; margin: 0 auto; }
     .grid-2col { display: grid; grid-template-columns: 1fr; gap: 16px; }
@@ -84,7 +85,7 @@
     .bar-row { margin-bottom: 10px; }
     .bar-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
     .bar-track { height: 8px; background: var(--rose-light); border-radius: 4px; overflow: hidden; }
-    .bar-fill { height: 100%; background: var(--rose-deep); border-radius: 4px; }
+    .bar-fill { height: 100%; background: var(--rose-soft); border-radius: 4px; }
 
     .empty { text-align: center; padding: 20px; color: var(--muted); font-size: 13px; }
   </style>
@@ -106,11 +107,13 @@
   };
 
   let db = null;
+  let auth = null;
   let useFirebase = false;
 
   try {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
+    auth = firebase.auth();
     useFirebase = true;
   } catch(e) { console.log("Erro ao iniciar Firebase", e); }
 
@@ -157,30 +160,48 @@
 
   function init(){
     if(useFirebase){
-      db.collection('delicatta').doc('dados').onSnapshot(doc => {
-        if(doc.exists){
-          const data = doc.data();
-          state.produtos = (data.produtos || DEFAULT_PRODUCTS).map(p => ({
-            ...p,
-            comissao: p.comissao !== undefined ? p.comissao : 0
-          }));
-          state.vendas = data.vendas || [];
-          state.dividas = data.dividas || [];
-          state.estoque = data.estoque || {};
-          render();
-        } else {
+      // Autenticação transparente com e-mail e senha da loja
+      auth.signInWithEmailAndPassword("loja@delicatta.com", "Delicatta123!")
+        .catch(error => {
+          if (error.code === 'auth/user-not-found') {
+            return auth.createUserWithEmailAndPassword("loja@delicatta.com", "Delicatta123!");
+          }
+        })
+        .then(() => {
+          connectFirestoreSync();
+        })
+        .catch(err => {
+          console.error("Erro na autenticação:", err);
           loadLocalDataOnly();
-          saveData(); 
-        }
-      }, err => {
-        console.error("Erro na leitura do Firebase", err);
-        loadLocalDataOnly();
-        render();
-      });
+          render();
+        });
     } else {
       loadLocalDataOnly();
       render();
     }
+  }
+
+  function connectFirestoreSync(){
+    db.collection('delicatta').doc('dados').onSnapshot(doc => {
+      if(doc.exists){
+        const data = doc.data();
+        state.produtos = (data.produtos || DEFAULT_PRODUCTS).map(p => ({
+          ...p,
+          comissao: p.comissao !== undefined ? p.comissao : 0
+        }));
+        state.vendas = data.vendas || [];
+        state.dividas = data.dividas || [];
+        state.estoque = data.estoque || {};
+        render();
+      } else {
+        loadLocalDataOnly();
+        saveData(); 
+      }
+    }, err => {
+      console.error("Erro na leitura do Firebase", err);
+      loadLocalDataOnly();
+      render();
+    });
   }
 
   function loadLocalDataOnly(){
@@ -202,7 +223,7 @@
     localStorage.setItem('delicatta:dividas', JSON.stringify(state.dividas));
     localStorage.setItem('delicatta:estoque', JSON.stringify(state.estoque));
 
-    if(useFirebase){
+    if(useFirebase && auth.currentUser){
       db.collection('delicatta').doc('dados').set({
         produtos: state.produtos,
         vendas: state.vendas,
@@ -310,7 +331,7 @@
 
     doc.setFont('times', 'bold');
     doc.setFontSize(22);
-    doc.setTextColor(168, 40, 94);
+    doc.setTextColor(181, 27, 90);
     doc.text('DELICATTA', 105, 20, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
@@ -320,7 +341,7 @@
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(168, 40, 94);
+    doc.setTextColor(181, 27, 90);
     doc.text('CLIENTE:', 20, 42);
     doc.text('DATA:', 190, 42, { align: 'right' });
 
@@ -331,20 +352,20 @@
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    doc.setTextColor(168, 40, 94);
+    doc.setTextColor(181, 27, 90);
     doc.text(isDivida ? 'EXTRATO DE CONTA' : 'FATURA DE VENDA', 20, 60);
 
     let y = 75;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(168, 40, 94);
+    doc.setTextColor(181, 27, 90);
 
     doc.text('ITEM / DESCRIÇÃO', 20, y);
     doc.text('QTD', 95, y, { align: 'center' });
     doc.text('PREÇO UNIT.', 140, y, { align: 'right' });
     doc.text('TOTAL', 190, y, { align: 'right' });
 
-    doc.setDrawColor(168, 40, 94);
+    doc.setDrawColor(181, 27, 90);
     doc.setLineWidth(0.8);
     doc.line(20, y + 3, 190, y + 3);
 
@@ -387,12 +408,12 @@
     const boxHeight = 26;
     const boxX = 105;
 
-    doc.setFillColor(253, 241, 246);
+    doc.setFillColor(252, 228, 236);
     doc.roundedRect(boxX, y, boxWidth, boxHeight, 3, 3, 'F');
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(168, 40, 94);
+    doc.setTextColor(181, 27, 90);
     doc.text(isDivida ? 'Valor Total Pendente:' : 'Valor Total Pago:', boxX + boxWidth - 8, y + 9, { align: 'right' });
 
     doc.setFontSize(14);
@@ -444,7 +465,7 @@
           <div class="brand">Delicatta<span class="dot">.</span></div>
           <div class="tagline">Gestão do meu negócio 💗</div>
         </div>
-        <div class="sync-badge">${useFirebase ? '🟢 Nuvem Ativa' : '🟡 Modo Teste Local'}</div>
+        <div class="sync-badge">${useFirebase ? '🟢 Nuvem Protegida' : '🟡 Modo Teste Local'}</div>
       </div>
     </div>`;
   }
@@ -820,8 +841,8 @@
       <div>
         <div class="section-title">Estado da Ligação</div>
         <div class="form-card">
-          <p>${useFirebase ? '🟢 O teu app está 100% conectado à nuvem do Firebase!' : '🟡 Modo Local ativo.'}</p>
-          <p style="font-size:12px;color:var(--muted)">Tudo o que fizeres no telemóvel aparece automaticamente no computador e vice-versa.</p>
+          <p>${useFirebase ? '🟢 App 100% protegido e conectado à nuvem!' : '🟡 Modo Local ativo.'}</p>
+          <p style="font-size:12px;color:var(--muted)">O teu banco de dados está trancado contra estranhos e sincronizado exclusivamente entre os vossos telemóveis e computadores.</p>
         </div>
         
         <div class="section-title" style="margin-top:20px;">Cópia de Segurança (Backup)</div>
